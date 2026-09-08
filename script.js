@@ -12,7 +12,8 @@ function addSong() {
     songList.appendChild(newSong);
 
    if(songInput = songName) {
-      then addSong
+       addSong
+   }
    
    songInput.value = ""
    
