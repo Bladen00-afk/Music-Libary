@@ -3,18 +3,17 @@ function addSong() {
 
    let songName = songInput.value;
 
+   if ( songName === ""){
+      then songInput.value = ""
+
    let newSong = document.createElement("li");
 
     newSong.textContent = songName;
 
    let songList = document.getElementById("songList");
 
-    songList.appendChild(newSong);
+   songList.appendChild(newSong);
 
-   if(songInput = songName) {
-       addSong
-   }
-   
    songInput.value = ""
    
 
