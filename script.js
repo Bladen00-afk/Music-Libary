@@ -3,8 +3,7 @@ function addSong() {
 
    let songName = songInput.value;
 
-   if ( songName === ""){
-      then songInput.value = ""
+   if ( songName !== ""){
 
    let newSong = document.createElement("li");
 
@@ -16,7 +15,7 @@ function addSong() {
 
    songInput.value = ""
    
-
+   }
    
 }
   
