@@ -7,10 +7,8 @@ function addSong() {
 
     newSong.textContent = songName;
 
-   let songList = document.getElementbyId("songList");
+   let songList = document.getElementById("songList");
 
     songList.appendChild(newSong);
-
-
 }
   
