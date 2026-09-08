@@ -9,7 +9,7 @@ function addSong() {
 
    let songList = document.getElementById("songList");
 
-    songList.appendChild(newSong);
-   alert(songName);
+    songList.appendChild(newSong);  
+   alert("script loaded");
 }
   
