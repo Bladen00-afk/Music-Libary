@@ -10,6 +10,6 @@ function addSong() {
    let songList = document.getElementById("songList");
 
     songList.appendChild(newSong);
-   alert("Function ran!");
+   alert(songName);
 }
   
