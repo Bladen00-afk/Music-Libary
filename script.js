@@ -9,7 +9,14 @@ function addSong() {
 
    let songList = document.getElementById("songList");
 
-    songList.appendChild(newSong);  
-   alert("script loaded");
+    songList.appendChild(newSong);
+
+   if(songInput = songName) {
+      then addSong
+   
+   songInput.value = ""
+   
+
+   
 }
   
