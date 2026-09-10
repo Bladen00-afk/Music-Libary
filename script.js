@@ -19,12 +19,12 @@ function addSong() {
       newSong.remove();
    };
       
-   newSong.appendchild("deleteButton");
+   newSong.appendChild(deleteButton);
       
    songList.appendChild(newSong);
       
    songInput.value = ""
-
-   
+      
+   }    
 }
   
