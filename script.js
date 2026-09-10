@@ -15,12 +15,11 @@ function addSong() {
 
    songInput.value = ""
       
-   let deleteButton = document.createElement("Button");
+   let deleteButton = document.createElement("button");
    
-   deleteButton.textContent = "Delete"
+   deleteButton.textContent = "Delete";
       
    deleteButton.onclick = function() {
-    
       newSong.remove();
    };
       
