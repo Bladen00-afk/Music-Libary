@@ -1,5 +1,4 @@
 function addSong() {
- alert("1");
     
  let songInput = document.getElementById("songInput");
 
