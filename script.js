@@ -1,5 +1,7 @@
 function addSong() {
+   
    alert(Function Works!");
+      
    let songInput = document.getElementById("songInput");
 
    let songName = songInput.value;
