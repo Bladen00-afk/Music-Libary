@@ -14,8 +14,18 @@ function addSong() {
    songList.appendChild(newSong);
 
    songInput.value = ""
+      
+   let deleteButton = document.createElement("Button");
    
-   }
+   deleteButton.textContent = "Delete"
+      
+   deleteButton.onclick = function() {
+    
+      newSong.remove();
+   };
+      
+   newSong.appendchild("deleteButton");
+
    
 }
   
