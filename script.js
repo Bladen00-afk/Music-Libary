@@ -10,10 +10,6 @@ function addSong() {
     newSong.textContent = songName;
 
    let songList = document.getElementById("songList");
-
-   songList.appendChild(newSong);
-
-   songInput.value = ""
       
    let deleteButton = document.createElement("button");
    
@@ -24,6 +20,10 @@ function addSong() {
    };
       
    newSong.appendchild("deleteButton");
+      
+   songList.appendChild(newSong);
+      
+   songInput.value = ""
 
    
 }
