@@ -2,14 +2,13 @@ function addSong() {
  alert("1");
     
  let songInput = document.getElementById("songInput");
- alert("2");
+
 
    let songName = songInput.value;
-alert("3");
+
    if ( songName !== ""){
-alert("4");
+
    let newSong = document.createElement("li");
-    alert("5");
     
     newSong.textContent = songName;
 
