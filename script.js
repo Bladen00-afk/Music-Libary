@@ -1,10 +1,6 @@
 function addSong() {
  alert("Function Works!");
-   
-   let songInput = document.getElementById("songInput");
-
-   let songName = songInput.value;
-
+}
    if ( songName !== ""){
 
    let newSong = document.createElement("li");
