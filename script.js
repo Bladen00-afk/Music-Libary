@@ -2,7 +2,6 @@ function addSong() {
     
  let songInput = document.getElementById("songInput");
 
-
    let songName = songInput.value;
 
    if ( songName !== ""){
@@ -26,6 +25,10 @@ function addSong() {
    songList.appendChild(newSong);
       
    songInput.value = ""
+
+  console.log(songInput);
+
+       
       
    }    
 }
