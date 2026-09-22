@@ -2,11 +2,10 @@ function addSong() {
     
  let songInput = document.getElementById("songInput");
 
-   if ( songName !== ""){
-
-   let newSong = document.createElement("li");
+   if ( songInput.files.length > 0 ){
+    let file  = songInput.files[0]
        
-       let file  = SongInput.files[0]
+   let newSong = document.createElement("li");
        
        let songName = file.name;
     
@@ -28,10 +27,7 @@ function addSong() {
       
    songInput.value = ""
 
-  console.log(songInput);
-
-       
-      
+         
    }    
 }
   
