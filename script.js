@@ -3,11 +3,12 @@ function addSong() {
  let songInput = document.getElementById("songInput");
 
    if ( songInput.files.length > 0 ){
+       
     let file  = songInput.files[0]
        
    let newSong = document.createElement("li");
        
-       let songName = file.length;
+       let songName = file.name;
     
     newSong.textContent = songName;
 
