@@ -7,7 +7,7 @@ function addSong() {
        
    let newSong = document.createElement("li");
        
-       let songName = file.name;
+       let songName = file.length;
     
     newSong.textContent = songName;
 
