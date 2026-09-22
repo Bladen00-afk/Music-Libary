@@ -7,6 +7,10 @@ function addSong() {
    if ( songName !== ""){
 
    let newSong = document.createElement("li");
+       
+       let file  = SongInput.files[0]
+       
+       let songName = file.name;
     
     newSong.textContent = songName;
 
