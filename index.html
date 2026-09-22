@@ -1,14 +1,40 @@
 <!DOCTYPE html>
-<html>
-<head> 
-   <title>Music Library</title>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>BlueNote | Music Library</title>
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Music Library</h1>
- <input type="file" id="songInput" accept=".mp3">
-    <button onclick="addSong()">Add Song</button>
-   <ul id="songList"></ul>
-  <script src="script.js"></script>
+   <div class="app-shell">
+      <aside class="sidebar">
+         <a class="brand" href="#library" aria-label="BlueNote home"><span class="brand-mark">B</span><span>BlueNote</span></a>
+         <nav class="main-nav" aria-label="Primary navigation">
+            <a class="nav-link active" href="#library" data-view="library"><span class="nav-icon">LIB</span>Library</a>
+            <a class="nav-link" href="#playlists" data-view="playlists"><span class="nav-icon">PL</span>Playlists</a>
+            <a class="nav-link" href="#discover" data-view="discover"><span class="nav-icon">DISC</span>Discover</a>
+         </nav>
+         <div class="sidebar-section"><div class="sidebar-heading"><span>Your playlists</span><button class="icon-button" id="newPlaylistButton" title="Create playlist" aria-label="Create playlist">+</button></div><div id="playlistNav" class="playlist-nav"></div></div>
+         <div class="sidebar-footer"><button class="text-button" id="exportButton">Export library</button><label class="text-button file-label" for="importInput">Import library</label><input id="importInput" type="file" accept="application/json" hidden></div>
+      </aside>
+      <main class="main-content">
+         <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><span>/</span><strong id="viewLabel">Library</strong></div><div class="topbar-actions"><span class="storage-status"><span class="status-dot"></span>Saved on this device</span><button class="avatar" title="Profile">AM</button></div></header>
+         <section id="libraryView" class="view active-view">
+            <div class="page-heading"><div><p class="eyebrow">Your collection</p><h1>Music library</h1><p class="subheading">Keep every track close, then shape it into the soundtrack for your day.</p></div><div class="heading-actions"><label class="button primary-button" for="songInput">+ Add music</label><input id="songInput" type="file" accept="audio/mpeg,.mp3" multiple hidden></div></div>
+            <div class="stats-row"><div class="stat-card"><span class="stat-label">Tracks</span><strong id="trackCount">0</strong></div><div class="stat-card"><span class="stat-label">Playlists</span><strong id="playlistCount">0</strong></div><div class="stat-card accent-stat"><span class="stat-label">Now playing</span><strong id="nowPlayingStat">Nothing yet</strong></div></div>
+            <div class="content-panel"><div class="panel-header"><div><h2>All tracks</h2><p id="libraryHint">Add MP3 files to begin building your collection.</p></div><div class="search-wrap"><label for="searchInput">Search library</label><input id="searchInput" type="search" placeholder="Search tracks"></div></div><div id="songList" class="track-list"></div></div>
+         </section>
+         <section id="playlistsView" class="view"><div class="page-heading"><div><p class="eyebrow">Organize your sound</p><h1>Playlists</h1><p class="subheading">Give your favorite combinations a name and a place.</p></div><button class="button primary-button" id="newPlaylistButtonMain">+ New playlist</button></div><div id="playlistGrid" class="playlist-grid"></div></section>
+         <section id="discoverView" class="view"><div class="page-heading"><div><p class="eyebrow">Shared by the community</p><h1>Discover</h1><p class="subheading">Publish your playlists and find new sounds from other listeners.</p></div><button class="button primary-button" id="publishButton">Publish a playlist</button></div><div class="discover-banner"><div><span class="banner-kicker">Your stage</span><h2>Share the feeling behind your music.</h2><p>Published playlists appear here for your community. Your MP3 files stay on your device unless you connect a cloud service later.</p></div><span class="banner-mark">BN</span></div><div id="publishedGrid" class="published-grid"></div></section>
+      </main>
+   </div>
+   <footer class="player-bar"><div class="current-track"><div class="cover-art" id="playerArt">--</div><div><strong id="currentTitle">Nothing playing</strong><span id="currentMeta">Choose a track from your library</span></div></div><div class="player-controls"><div class="control-buttons"><button id="previousButton" class="player-button" title="Previous track">|&lt;</button><button id="playButton" class="play-button" title="Play or pause">Play</button><button id="nextButton" class="player-button" title="Next track">&gt;|</button><button id="loopButton" class="player-button loop-active" title="Loop playlist" aria-pressed="true">Loop</button></div><div class="progress-row"><span id="currentTime">0:00</span><input id="progressInput" type="range" min="0" max="100" value="0" aria-label="Track progress"><span id="duration">0:00</span></div></div><div class="volume-control"><label for="volumeInput">Volume</label><input id="volumeInput" type="range" min="0" max="1" step="0.01" value="0.8"></div></footer>
+   <audio id="audioPlayer"></audio>
+   <script src="script.js"></script>
 </body>
 </html>
-    
+

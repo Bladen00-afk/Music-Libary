@@ -1,34 +1,46 @@
-function addSong() {
-    
- let songInput = document.getElementById("songInput");
+const STORAGE_KEY = "bluenote-state";
+const DB_NAME = "bluenote-audio";
+const DB_VERSION = 1;
+const state = loadState();
+let currentPlaylistId = "library";
+let currentTrackId = null;
+let audioUrl = null;
 
-   if ( songInput.files.length > 0 ){
-       
-    let file  = songInput.files[0]
-       
-   let newSong = document.createElement("li");
-       
-       let songName = file.name;
-    
-    newSong.textContent = songName;
+const elements = { audio: document.getElementById("audioPlayer"), songInput: document.getElementById("songInput"), songList: document.getElementById("songList"), playlistNav: document.getElementById("playlistNav"), playlistGrid: document.getElementById("playlistGrid"), publishedGrid: document.getElementById("publishedGrid"), search: document.getElementById("searchInput"), play: document.getElementById("playButton"), currentTitle: document.getElementById("currentTitle"), currentMeta: document.getElementById("currentMeta"), progress: document.getElementById("progressInput"), currentTime: document.getElementById("currentTime"), duration: document.getElementById("duration"), volume: document.getElementById("volumeInput") };
 
-   let songList = document.getElementById("songList");
-      
-   let deleteButton = document.createElement("button");
-   
-   deleteButton.textContent = "Delete";
-      
-   deleteButton.onclick = function() {
-      newSong.remove();
-   };
-      
-   newSong.appendChild(deleteButton);
-      
-   songList.appendChild(newSong);
-      
-   songInput.value = ""
+function loadState() { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); return saved || { tracks: [], playlists: [{ id: "library", name: "All tracks", trackIds: [], published: false }], published: [] }; }
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function makeId() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+function getTrack(trackId) { return state.tracks.find((track) => track.id === trackId); }
+function getPlaylist(playlistId) { return state.playlists.find((playlist) => playlist.id === playlistId); }
+function displayName(fileName) { return fileName.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " "); }
+function formatTime(seconds) { if (!Number.isFinite(seconds)) return "0:00"; return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`; }
 
-         
-   }    
-}
-  
+function openDatabase() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onupgradeneeded = () => request.result.createObjectStore("tracks", { keyPath: "id" }); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
+async function storeFile(trackId, file) { const database = await openDatabase(); return new Promise((resolve, reject) => { const request = database.transaction("tracks", "readwrite").objectStore("tracks").put({ id: trackId, file }); request.onsuccess = resolve; request.onerror = () => reject(request.error); }); }
+async function getFile(trackId) { const database = await openDatabase(); return new Promise((resolve, reject) => { const request = database.transaction("tracks", "readonly").objectStore("tracks").get(trackId); request.onsuccess = () => resolve(request.result?.file || null); request.onerror = () => reject(request.error); }); }
+
+async function addSongs(files) { for (const file of files) { const track = { id: makeId(), name: displayName(file.name), fileName: file.name, addedAt: Date.now() }; state.tracks.push(track); state.playlists[0].trackIds.push(track.id); await storeFile(track.id, file); } saveState(); render(); }
+function render() { renderNav(); renderTracks(); renderPlaylists(); renderPublished(); document.getElementById("trackCount").textContent = state.tracks.length; document.getElementById("playlistCount").textContent = state.playlists.length - 1; document.getElementById("libraryHint").textContent = state.tracks.length ? `${state.tracks.length} track${state.tracks.length === 1 ? "" : "s"} ready to play.` : "Add MP3 files to begin building your collection."; }
+function renderNav() { elements.playlistNav.innerHTML = state.playlists.slice(1).map((playlist) => `<button class="playlist-nav-item" data-playlist="${playlist.id}">${escapeHtml(playlist.name)}<span>${playlist.trackIds.length}</span></button>`).join(""); elements.playlistNav.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { currentPlaylistId = button.dataset.playlist; showView("library"); renderTracks(); })); }
+function renderTracks() { const playlist = currentPlaylistId === "library" ? state.playlists[0] : getPlaylist(currentPlaylistId); const query = elements.search.value.toLowerCase(); const tracks = (playlist?.trackIds || []).map(getTrack).filter(Boolean).filter((track) => track.name.toLowerCase().includes(query)); elements.songList.innerHTML = tracks.length ? tracks.map((track, index) => `<div class="track-row ${track.id === currentTrackId ? "playing" : ""}"><span class="track-number">${String(index + 1).padStart(2, "0")}</span><button class="track-name" data-play="${track.id}"><span class="track-play-indicator">${track.id === currentTrackId ? "||" : ">"}</span>${escapeHtml(track.name)}</button><span class="track-file">${escapeHtml(track.fileName)}</span><button class="more-button" data-add="${track.id}" title="Add to playlist">Add</button><button class="more-button" data-delete="${track.id}" title="Remove track">Delete</button></div>`).join("") : `<div class="empty-state"><strong>${query ? "No matching tracks" : "Your library is ready for its first track"}</strong><span>${query ? "Try another search." : "Use Add music to store MP3 files in this browser."}</span></div>`; elements.songList.querySelectorAll("[data-play]").forEach((button) => button.addEventListener("click", () => playTrack(button.dataset.play))); elements.songList.querySelectorAll("[data-add]").forEach((button) => button.addEventListener("click", () => addToPlaylist(button.dataset.add))); elements.songList.querySelectorAll("[data-delete]").forEach((button) => button.addEventListener("click", () => deleteTrack(button.dataset.delete))); }
+function renderPlaylists() { elements.playlistGrid.innerHTML = state.playlists.slice(1).length ? state.playlists.slice(1).map((playlist) => `<article class="playlist-card"><div class="playlist-art"><span>${playlist.trackIds.length}</span><small>tracks</small></div><div class="playlist-card-body"><div><h3>${escapeHtml(playlist.name)}</h3><p>${playlist.trackIds.length} tracks${playlist.published ? " · Published" : ""}</p></div><div class="playlist-actions"><button class="small-button" data-open-playlist="${playlist.id}">Open</button><button class="small-button" data-rename-playlist="${playlist.id}">Rename</button></div></div></article>`).join("") : `<div class="empty-state wide"><strong>No playlists yet</strong><span>Create one to start arranging your collection.</span></div>`; elements.playlistGrid.querySelectorAll("[data-open-playlist]").forEach((button) => button.addEventListener("click", () => { currentPlaylistId = button.dataset.openPlaylist; showView("library"); renderTracks(); })); elements.playlistGrid.querySelectorAll("[data-rename-playlist]").forEach((button) => button.addEventListener("click", () => renamePlaylist(button.dataset.renamePlaylist))); }
+function renderPublished() { elements.publishedGrid.innerHTML = state.published.length ? state.published.map((item) => `<article class="published-card"><span class="published-label">Published playlist</span><h3>${escapeHtml(item.name)}</h3><p>${item.trackCount} tracks · by ${escapeHtml(item.author)}</p><button class="small-button" data-play-published="${item.playlistId}">Play preview</button></article>`).join("") : `<div class="empty-state wide"><strong>Your discovery feed is quiet</strong><span>Publish a playlist to put your music on the stage.</span></div>`; elements.publishedGrid.querySelectorAll("[data-play-published]").forEach((button) => button.addEventListener("click", () => { currentPlaylistId = button.dataset.playPublished; showView("library"); renderTracks(); })); }
+
+async function playTrack(trackId) { const track = getTrack(trackId); if (!track) return; const file = await getFile(trackId); if (!file) return; if (audioUrl) URL.revokeObjectURL(audioUrl); audioUrl = URL.createObjectURL(file); elements.audio.src = audioUrl; currentTrackId = trackId; elements.currentTitle.textContent = track.name; elements.currentMeta.textContent = track.fileName; document.getElementById("nowPlayingStat").textContent = track.name; await elements.audio.play(); renderTracks(); updatePlayButton(); }
+function trackSequence() { const playlist = currentPlaylistId === "library" ? state.playlists[0] : getPlaylist(currentPlaylistId); return playlist?.trackIds || []; }
+function moveTrack(direction) { const sequence = trackSequence(); if (!sequence.length) return; const index = Math.max(0, sequence.indexOf(currentTrackId)); const nextIndex = (index + direction + sequence.length) % sequence.length; playTrack(sequence[nextIndex]); }
+function updatePlayButton() { elements.play.textContent = elements.audio.paused ? "Play" : "Pause"; }
+function deleteTrack(trackId) { state.tracks = state.tracks.filter((track) => track.id !== trackId); state.playlists.forEach((playlist) => { playlist.trackIds = playlist.trackIds.filter((id) => id !== trackId); }); if (currentTrackId === trackId) { elements.audio.pause(); currentTrackId = null; } saveState(); render(); }
+function escapeHtml(value) { return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]); }
+function addToPlaylist(trackId) { const playlists = state.playlists.slice(1); if (!playlists.length) { alert("Create a playlist first."); return; } const choice = prompt(`Type the number of the playlist to add this track to:\n${playlists.map((playlist, index) => `${index + 1}. ${playlist.name}`).join("\n")}`); const playlist = playlists[Number(choice) - 1]; if (!playlist || playlist.trackIds.includes(trackId)) return; playlist.trackIds.push(trackId); saveState(); render(); }
+function createPlaylist() { const name = prompt("Name your playlist:", "New playlist"); if (!name?.trim()) return; state.playlists.push({ id: makeId(), name: name.trim(), trackIds: [], published: false }); saveState(); render(); }
+function renamePlaylist(playlistId) { const playlist = getPlaylist(playlistId); const name = prompt("Rename playlist:", playlist?.name || ""); if (playlist && name?.trim()) { playlist.name = name.trim(); saveState(); render(); } }
+function publishPlaylist() { const playlists = state.playlists.slice(1); if (!playlists.length) { alert("Create a playlist before publishing it."); return; } const choice = prompt(`Type the number of the playlist to publish:\n${playlists.map((playlist, index) => `${index + 1}. ${playlist.name}`).join("\n")}`); const playlist = playlists[Number(choice) - 1]; if (!playlist) return; playlist.published = true; state.published = state.published.filter((item) => item.playlistId !== playlist.id); state.published.push({ playlistId: playlist.id, name: playlist.name, trackCount: playlist.trackIds.length, author: "You" }); saveState(); render(); }
+function showView(viewName) { document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active-view", view.id === `${viewName}View`)); document.querySelectorAll(".nav-link").forEach((link) => link.classList.toggle("active", link.dataset.view === viewName)); document.getElementById("viewLabel").textContent = viewName[0].toUpperCase() + viewName.slice(1); }
+
+elements.songInput.addEventListener("change", () => addSongs([...elements.songInput.files])); elements.search.addEventListener("input", renderTracks); elements.play.addEventListener("click", () => { if (!currentTrackId) moveTrack(1); else if (elements.audio.paused) elements.audio.play(); else elements.audio.pause(); updatePlayButton(); }); document.getElementById("previousButton").addEventListener("click", () => moveTrack(-1)); document.getElementById("nextButton").addEventListener("click", () => moveTrack(1)); document.getElementById("loopButton").addEventListener("click", (event) => { elements.audio.loop = !elements.audio.loop; event.currentTarget.classList.toggle("loop-active", elements.audio.loop); event.currentTarget.setAttribute("aria-pressed", String(elements.audio.loop)); }); elements.volume.addEventListener("input", () => { elements.audio.volume = elements.volume.value; }); elements.progress.addEventListener("input", () => { if (elements.audio.duration) elements.audio.currentTime = (elements.progress.value / 100) * elements.audio.duration; }); elements.audio.addEventListener("loadedmetadata", () => { elements.duration.textContent = formatTime(elements.audio.duration); }); elements.audio.addEventListener("timeupdate", () => { elements.currentTime.textContent = formatTime(elements.audio.currentTime); elements.progress.value = elements.audio.duration ? (elements.audio.currentTime / elements.audio.duration) * 100 : 0; }); elements.audio.addEventListener("ended", () => { if (!elements.audio.loop) moveTrack(1); });
+document.querySelectorAll(".nav-link").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showView(link.dataset.view); })); document.getElementById("newPlaylistButton").addEventListener("click", createPlaylist); document.getElementById("newPlaylistButtonMain").addEventListener("click", createPlaylist); document.getElementById("publishButton").addEventListener("click", publishPlaylist);
+document.getElementById("exportButton").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "bluenote-library.json"; link.click(); URL.revokeObjectURL(link.href); }); document.getElementById("importInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; try { const imported = JSON.parse(await file.text()); if (!imported.tracks || !imported.playlists) throw new Error("Invalid library"); Object.assign(state, imported); saveState(); render(); } catch { alert("That file is not a valid BlueNote library export."); } event.target.value = ""; });
+elements.audio.volume = elements.volume.value; render();
+
