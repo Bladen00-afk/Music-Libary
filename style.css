@@ -12,4 +12,14 @@
 
 .track-row { grid-template-columns: 44px minmax(160px, 1.5fr) minmax(80px, 1fr) 76px 52px 58px; }
 @media (max-width: 800px) { .track-row { grid-template-columns: 35px minmax(0, 1fr) 76px 52px 58px; } }
+.shared-track-panel { margin-bottom: 28px; }
+.shared-track-tools { display: flex; align-items: end; gap: 14px; }
+.shared-track-tools .search-wrap input { width: 190px; }
+.shared-track-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; padding-top: 10px; padding-bottom: 10px; }
+.shared-track-info { min-width: 0; display: grid; gap: 4px; }
+.shared-track-info strong, .shared-track-info span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-track-info strong { color: var(--ink); font-size: 13px; }
+.shared-track-info span { color: var(--muted); font-size: 11px; }
+.shared-track-panel > .export-status { margin: 0; padding: 0 20px; }
+@media (max-width: 800px) { .shared-track-row { grid-template-columns: 35px minmax(0, 1fr) auto; }.shared-track-tools { width: 100%; align-items: end; }.shared-track-tools .search-wrap { flex: 1; }.shared-track-tools .search-wrap input { width: 100%; } }
 

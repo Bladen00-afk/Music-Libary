@@ -5,6 +5,7 @@ const state = loadState();
 let currentPlaylistId = "library";
 let currentTrackId = null;
 let audioUrl = null;
+let sharedTracks = [];
 
 const elements = { audio: document.getElementById("audioPlayer"), songInput: document.getElementById("songInput"), songList: document.getElementById("songList"), playlistNav: document.getElementById("playlistNav"), playlistGrid: document.getElementById("playlistGrid"), publishedGrid: document.getElementById("publishedGrid"), search: document.getElementById("searchInput"), trackListTitle: document.getElementById("trackListTitle"), play: document.getElementById("playButton"), currentTitle: document.getElementById("currentTitle"), currentMeta: document.getElementById("currentMeta"), progress: document.getElementById("progressInput"), currentTime: document.getElementById("currentTime"), duration: document.getElementById("duration"), volume: document.getElementById("volumeInput") };
 
@@ -15,6 +16,56 @@ function getTrack(trackId) { return state.tracks.find((track) => track.id === tr
 function getPlaylist(playlistId) { return state.playlists.find((playlist) => playlist.id === playlistId); }
 function displayName(fileName) { return fileName.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " "); }
 function formatTime(seconds) { if (!Number.isFinite(seconds)) return "0:00"; return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`; }
+function formatFileSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
+
+async function loadSharedTracks() {
+	const list = document.getElementById("sharedTrackList");
+	try {
+		const response = await fetch("/api/shared-tracks");
+		if (!response.ok) throw new Error("Could not load shared MP3s.");
+		sharedTracks = await response.json();
+		renderSharedTracks();
+	} catch {
+		list.innerHTML = `<div class="empty-state"><strong>Shared MP3s are unavailable</strong><span>Start the Node server to load community tracks.</span></div>`;
+	}
+}
+
+function renderSharedTracks() {
+	const list = document.getElementById("sharedTrackList");
+	const query = document.getElementById("sharedTrackSearch").value.trim().toLowerCase();
+	const tracks = sharedTracks.filter((track) => `${track.name} ${track.fileName}`.toLowerCase().includes(query));
+	list.innerHTML = tracks.length ? tracks.map((track, index) => `<div class="track-row shared-track-row"><span class="track-number">${String(index + 1).padStart(2, "0")}</span><div class="shared-track-info"><strong>${escapeHtml(track.name)}</strong><span>${escapeHtml(track.fileName)} · ${formatFileSize(track.size)}</span></div><a class="small-button" href="/api/shared-tracks/${encodeURIComponent(track.id)}/download">Download</a></div>`).join("") : `<div class="empty-state"><strong>${query ? "No matching MP3s" : "No shared MP3s yet"}</strong><span>${query ? "Try a different search." : "Upload a track to start the community collection."}</span></div>`;
+}
+
+async function uploadSharedTrack(event) {
+	const input = event.currentTarget;
+	const file = input.files[0];
+	if (!file) return;
+	const status = document.getElementById("sharedTrackStatus");
+	if (file.size > 25 * 1024 * 1024) {
+		status.textContent = "MP3 files must be 25 MB or smaller.";
+		input.value = "";
+		return;
+	}
+	input.disabled = true;
+	status.textContent = "Uploading MP3...";
+	try {
+		const response = await fetch(`/api/shared-tracks?name=${encodeURIComponent(file.name)}`, {
+			method: "POST",
+			headers: { "Content-Type": file.type || "application/octet-stream" },
+			body: file
+		});
+		const result = await response.json();
+		if (!response.ok) throw new Error(result.error || "Upload failed.");
+		status.textContent = "MP3 uploaded and ready to download.";
+		input.value = "";
+		await loadSharedTracks();
+	} catch (error) {
+		status.textContent = error.message || "Upload failed. Check your connection and try again.";
+	} finally {
+		input.disabled = false;
+	}
+}
 
 function openDatabase() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onupgradeneeded = () => request.result.createObjectStore("tracks", { keyPath: "id" }); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
 async function storeFile(trackId, file) { const database = await openDatabase(); return new Promise((resolve, reject) => { const request = database.transaction("tracks", "readwrite").objectStore("tracks").put({ id: trackId, file }); request.onsuccess = resolve; request.onerror = () => reject(request.error); }); }
@@ -46,4 +97,7 @@ elements.songInput.addEventListener("change", () => addSongs([...elements.songIn
 document.querySelectorAll(".nav-link").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); if (link.dataset.view === "library") selectLibrary(); else showView(link.dataset.view); })); document.getElementById("newPlaylistButton").addEventListener("click", createPlaylist); document.getElementById("newPlaylistButtonMain").addEventListener("click", createPlaylist); document.getElementById("publishButton").addEventListener("click", publishPlaylist);
 document.getElementById("exportButton").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "bluenote-library.json"; link.click(); URL.revokeObjectURL(link.href); }); document.getElementById("importInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; try { const imported = JSON.parse(await file.text()); if (!imported.tracks || !imported.playlists) throw new Error("Invalid library"); Object.assign(state, imported); saveState(); render(); } catch { alert("That file is not a valid BlueNote library export."); } event.target.value = ""; });
 elements.audio.volume = elements.volume.value; render();
+document.getElementById("sharedTrackInput").addEventListener("change", uploadSharedTrack);
+document.getElementById("sharedTrackSearch").addEventListener("input", renderSharedTracks);
+loadSharedTracks();
 
