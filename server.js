@@ -7,6 +7,7 @@ const { URL } = require("url");
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT_DIR = __dirname;
 const SHARED_TRACKS_DIR = process.env.SHARED_TRACKS_DIR || path.join(ROOT_DIR, "uploads");
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "";
 const MAX_SHARED_TRACK_SIZE = 25 * 1024 * 1024;
 const configuredStorageLimit = Number(process.env.MAX_SHARED_STORAGE_BYTES);
 const MAX_SHARED_STORAGE_BYTES = Number.isSafeInteger(configuredStorageLimit) && configuredStorageLimit > 0
@@ -32,6 +33,16 @@ const MIME_TYPES = {
 function sendJson(res, statusCode, body) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   res.end(JSON.stringify(body));
+}
+
+function setApiCorsHeaders(req, res) {
+  if (!ALLOWED_ORIGIN || req.headers.origin !== ALLOWED_ORIGIN) return false;
+  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "600");
+  res.setHeader("Vary", "Origin");
+  return true;
 }
 
 function sanitizeFileName(value) {
@@ -207,6 +218,23 @@ const server = http.createServer((req, res) => {
   } catch {
     sendJson(res, 400, { error: "Invalid request URL." });
     return;
+  }
+  const isSharedApi = url.pathname === "/api/shared-tracks" || /^\/api\/shared-tracks\/[^/]+\/download$/.test(url.pathname);
+  if (isSharedApi) {
+    const corsAllowed = setApiCorsHeaders(req, res);
+    if (req.method === "OPTIONS") {
+      if (!corsAllowed) {
+        sendJson(res, 403, { error: "This site is not allowed to access the shared MP3 API." });
+        return;
+      }
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (ALLOWED_ORIGIN && req.headers.origin && !corsAllowed) {
+      sendJson(res, 403, { error: "This site is not allowed to access the shared MP3 API." });
+      return;
+    }
   }
   if (url.pathname === "/api/shared-tracks") {
     if (req.method === "GET") {

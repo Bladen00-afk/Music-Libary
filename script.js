@@ -1,16 +1,116 @@
 const STORAGE_KEY = "bluenote-state";
 const DB_NAME = "bluenote-audio";
 const DB_VERSION = 1;
+const APPEARANCE_STORAGE_KEY = "bluenote-appearance";
+const DEFAULT_APPEARANCE = { accent: "#1459d9", page: "#f7faff", text: "#10233f", backgroundImage: "" };
+const SHARED_API_BASE = String(window.MUSIC_LIBRARY_API_BASE || "").replace(/\/+$/, "");
+const API_UNAVAILABLE_MESSAGE = "The shared MP3 server is unavailable. GitHub Pages only hosts static files; deploy server.js, set config.js to its URL, and allow this site's origin on the server.";
 const state = loadState();
 let currentPlaylistId = "library";
 let currentTrackId = null;
 let audioUrl = null;
 let sharedTracks = [];
+let appearance = loadAppearance();
 
 const elements = { audio: document.getElementById("audioPlayer"), songInput: document.getElementById("songInput"), songList: document.getElementById("songList"), playlistNav: document.getElementById("playlistNav"), playlistGrid: document.getElementById("playlistGrid"), publishedGrid: document.getElementById("publishedGrid"), search: document.getElementById("searchInput"), trackListTitle: document.getElementById("trackListTitle"), play: document.getElementById("playButton"), currentTitle: document.getElementById("currentTitle"), currentMeta: document.getElementById("currentMeta"), progress: document.getElementById("progressInput"), currentTime: document.getElementById("currentTime"), duration: document.getElementById("duration"), volume: document.getElementById("volumeInput") };
 
 function loadState() { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); return saved || { tracks: [], playlists: [{ id: "library", name: "All tracks", trackIds: [], published: false }], published: [] }; }
 function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function loadAppearance() {
+	try {
+		const saved = JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) || "{}");
+		const validColor = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+		const backgroundImage = typeof saved.backgroundImage === "string" && saved.backgroundImage.startsWith("data:image/jpeg;base64,") && saved.backgroundImage.length <= 4_500_000 ? saved.backgroundImage : "";
+		return {
+			accent: validColor(saved.accent, DEFAULT_APPEARANCE.accent),
+			page: validColor(saved.page, DEFAULT_APPEARANCE.page),
+			text: validColor(saved.text, DEFAULT_APPEARANCE.text),
+			backgroundImage
+		};
+	} catch {
+		return { ...DEFAULT_APPEARANCE };
+	}
+}
+function applyAppearance() {
+	const root = document.documentElement;
+	root.style.setProperty("--blue", appearance.accent);
+	root.style.setProperty("--bright", appearance.accent);
+	root.style.setProperty("--ink", appearance.text);
+	root.style.setProperty("--user-page-background", appearance.page);
+	root.style.setProperty("--user-background-image", appearance.backgroundImage ? `url("${appearance.backgroundImage}")` : "none");
+}
+function saveAppearance() {
+	applyAppearance();
+	try {
+		localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
+		return true;
+	} catch {
+		return false;
+	}
+}
+function syncAppearanceControls() {
+	document.getElementById("accentColorInput").value = appearance.accent;
+	document.getElementById("pageColorInput").value = appearance.page;
+	document.getElementById("textColorInput").value = appearance.text;
+}
+function blobToDataUrl(blob) {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(reader.result);
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(blob);
+	});
+}
+async function optimizeBackgroundImage(file) {
+	const image = await createImageBitmap(file);
+	const scale = Math.min(1, 1800 / image.width, 1200 / image.height);
+	const canvas = document.createElement("canvas");
+	canvas.width = Math.max(1, Math.round(image.width * scale));
+	canvas.height = Math.max(1, Math.round(image.height * scale));
+	canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+	image.close();
+	const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+	if (!blob) throw new Error("This image could not be processed.");
+	const dataUrl = await blobToDataUrl(blob);
+	if (dataUrl.length > 4_500_000) throw new Error("Choose a smaller image.");
+	return dataUrl;
+}
+function initializeAppearance() {
+	applyAppearance();
+	syncAppearanceControls();
+	for (const [id, key] of [["accentColorInput", "accent"], ["pageColorInput", "page"], ["textColorInput", "text"]]) {
+		document.getElementById(id).addEventListener("input", (event) => {
+			appearance[key] = event.currentTarget.value;
+			saveAppearance();
+		});
+	}
+	document.getElementById("backgroundImageInput").addEventListener("change", async (event) => {
+		const input = event.currentTarget;
+		const file = input.files[0];
+		if (!file) return;
+		const status = document.getElementById("appearanceStatus");
+		try {
+			appearance.backgroundImage = await optimizeBackgroundImage(file);
+			if (!saveAppearance()) throw new Error("There is not enough browser storage to save this image.");
+			status.textContent = "Background photo saved.";
+		} catch (error) {
+			status.textContent = error.message || "Could not save this image.";
+		} finally {
+			input.value = "";
+		}
+	});
+	document.getElementById("removeBackgroundImageButton").addEventListener("click", () => {
+		appearance.backgroundImage = "";
+		saveAppearance();
+		document.getElementById("appearanceStatus").textContent = "Background photo removed.";
+	});
+	document.getElementById("resetAppearanceButton").addEventListener("click", () => {
+		appearance = { ...DEFAULT_APPEARANCE };
+		saveAppearance();
+		syncAppearanceControls();
+		document.getElementById("appearanceStatus").textContent = "Appearance reset.";
+	});
+}
 function makeId() { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function getTrack(trackId) { return state.tracks.find((track) => track.id === trackId); }
 function getPlaylist(playlistId) { return state.playlists.find((playlist) => playlist.id === playlistId); }
@@ -21,12 +121,14 @@ function formatFileSize(bytes) { return bytes < 1024 * 1024 ? `${Math.max(1, Mat
 async function loadSharedTracks() {
 	const list = document.getElementById("sharedTrackList");
 	try {
-		const response = await fetch("/api/shared-tracks");
+		const response = await fetch(`${SHARED_API_BASE}/api/shared-tracks`);
+		if (response.status === 404) throw new Error(API_UNAVAILABLE_MESSAGE);
 		if (!response.ok) throw new Error("Could not load shared MP3s.");
 		sharedTracks = await response.json();
 		renderSharedTracks();
-	} catch {
-		list.innerHTML = `<div class="empty-state"><strong>Shared MP3s are unavailable</strong><span>Start the Node server to load community tracks.</span></div>`;
+	} catch (error) {
+		const message = error instanceof TypeError ? API_UNAVAILABLE_MESSAGE : error.message;
+		list.innerHTML = `<div class="empty-state"><strong>Shared MP3s are unavailable</strong><span>${escapeHtml(message)}</span></div>`;
 	}
 }
 
@@ -34,7 +136,7 @@ function renderSharedTracks() {
 	const list = document.getElementById("sharedTrackList");
 	const query = document.getElementById("sharedTrackSearch").value.trim().toLowerCase();
 	const tracks = sharedTracks.filter((track) => `${track.name} ${track.fileName}`.toLowerCase().includes(query));
-	list.innerHTML = tracks.length ? tracks.map((track, index) => `<div class="track-row shared-track-row"><span class="track-number">${String(index + 1).padStart(2, "0")}</span><div class="shared-track-info"><strong>${escapeHtml(track.name)}</strong><span>${escapeHtml(track.fileName)} · ${formatFileSize(track.size)}</span></div><a class="small-button" href="/api/shared-tracks/${encodeURIComponent(track.id)}/download">Download</a></div>`).join("") : `<div class="empty-state"><strong>${query ? "No matching MP3s" : "No shared MP3s yet"}</strong><span>${query ? "Try a different search." : "Upload a track to start the community collection."}</span></div>`;
+	list.innerHTML = tracks.length ? tracks.map((track, index) => `<div class="track-row shared-track-row"><span class="track-number">${String(index + 1).padStart(2, "0")}</span><div class="shared-track-info"><strong>${escapeHtml(track.name)}</strong><span>${escapeHtml(track.fileName)} · ${formatFileSize(track.size)}</span></div><a class="small-button" href="${SHARED_API_BASE}/api/shared-tracks/${encodeURIComponent(track.id)}/download">Download</a></div>`).join("") : `<div class="empty-state"><strong>${query ? "No matching MP3s" : "No shared MP3s yet"}</strong><span>${query ? "Try a different search." : "Upload a track to start the community collection."}</span></div>`;
 }
 
 async function uploadSharedTrack(event) {
@@ -50,18 +152,19 @@ async function uploadSharedTrack(event) {
 	input.disabled = true;
 	status.textContent = "Uploading MP3...";
 	try {
-		const response = await fetch(`/api/shared-tracks?name=${encodeURIComponent(file.name)}`, {
+		const response = await fetch(`${SHARED_API_BASE}/api/shared-tracks?name=${encodeURIComponent(file.name)}`, {
 			method: "POST",
 			headers: { "Content-Type": file.type || "application/octet-stream" },
 			body: file
 		});
-		const result = await response.json();
+		const result = await response.json().catch(() => ({}));
+		if (response.status === 404) throw new Error(API_UNAVAILABLE_MESSAGE);
 		if (!response.ok) throw new Error(result.error || "Upload failed.");
 		status.textContent = "MP3 uploaded and ready to download.";
 		input.value = "";
 		await loadSharedTracks();
 	} catch (error) {
-		status.textContent = error.message || "Upload failed. Check your connection and try again.";
+		status.textContent = error instanceof TypeError ? API_UNAVAILABLE_MESSAGE : error.message || "Upload failed. Check your connection and try again.";
 	} finally {
 		input.disabled = false;
 	}
@@ -96,6 +199,7 @@ function showView(viewName) { document.querySelectorAll(".view").forEach((view) 
 elements.songInput.addEventListener("change", () => addSongs([...elements.songInput.files])); elements.search.addEventListener("input", renderTracks); elements.play.addEventListener("click", () => { if (!currentTrackId) moveTrack(1); else if (elements.audio.paused) elements.audio.play(); else elements.audio.pause(); updatePlayButton(); }); document.getElementById("previousButton").addEventListener("click", () => moveTrack(-1)); document.getElementById("nextButton").addEventListener("click", () => moveTrack(1)); document.getElementById("loopButton").addEventListener("click", (event) => { elements.audio.loop = !elements.audio.loop; event.currentTarget.classList.toggle("loop-active", elements.audio.loop); event.currentTarget.setAttribute("aria-pressed", String(elements.audio.loop)); }); elements.volume.addEventListener("input", () => { elements.audio.volume = elements.volume.value; }); elements.progress.addEventListener("input", () => { if (elements.audio.duration) elements.audio.currentTime = (elements.progress.value / 100) * elements.audio.duration; }); elements.audio.addEventListener("loadedmetadata", () => { elements.duration.textContent = formatTime(elements.audio.duration); }); elements.audio.addEventListener("timeupdate", () => { elements.currentTime.textContent = formatTime(elements.audio.currentTime); elements.progress.value = elements.audio.duration ? (elements.audio.currentTime / elements.audio.duration) * 100 : 0; }); elements.audio.addEventListener("ended", () => { if (!elements.audio.loop) moveTrack(1); });
 document.querySelectorAll(".nav-link").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); if (link.dataset.view === "library") selectLibrary(); else showView(link.dataset.view); })); document.getElementById("newPlaylistButton").addEventListener("click", createPlaylist); document.getElementById("newPlaylistButtonMain").addEventListener("click", createPlaylist); document.getElementById("publishButton").addEventListener("click", publishPlaylist);
 document.getElementById("exportButton").addEventListener("click", () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "bluenote-library.json"; link.click(); URL.revokeObjectURL(link.href); }); document.getElementById("importInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; try { const imported = JSON.parse(await file.text()); if (!imported.tracks || !imported.playlists) throw new Error("Invalid library"); Object.assign(state, imported); saveState(); render(); } catch { alert("That file is not a valid BlueNote library export."); } event.target.value = ""; });
+initializeAppearance();
 elements.audio.volume = elements.volume.value; render();
 document.getElementById("sharedTrackInput").addEventListener("change", uploadSharedTrack);
 document.getElementById("sharedTrackSearch").addEventListener("input", renderSharedTracks);
