@@ -22,4 +22,12 @@
 .shared-track-info span { color: var(--muted); font-size: 11px; }
 .shared-track-panel > .export-status { margin: 0; padding: 0 20px; }
 @media (max-width: 800px) { .shared-track-row { grid-template-columns: 35px minmax(0, 1fr) auto; }.shared-track-tools { width: 100%; align-items: end; }.shared-track-tools .search-wrap { flex: 1; }.shared-track-tools .search-wrap input { width: 100%; } }
+.appearance-controls { max-width: 760px; border-top: 1px solid var(--line); }
+.appearance-row { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 4px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; }
+.appearance-row input[type="color"] { width: 54px; height: 42px; padding: 4px; border: 1px solid var(--line); border-radius: 5px; background: white; }
+.appearance-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.appearance-actions .button { margin: 0; }
+.appearance-actions .text-button { color: var(--blue); font-size: 12px; }
+.appearance-controls > .export-status { padding-top: 12px; }
+body { color: var(--ink); background-color: var(--user-page-background, #f7faff); background-image: var(--user-background-image, none); background-position: center; background-size: cover; background-attachment: fixed; }
 
